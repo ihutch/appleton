@@ -4,7 +4,8 @@ XLIBS = -L. -laccisX -lXt -lX11
 MINGW=i686-w64-mingw32-gfortran
 MINGW-SWITCHES= -H -mwindows -mconsole --static
 MINGWLIBS=-L. -laccisWin
-COMPILE-SWITCHES = -Wall -O2
+# -02 provoked aggressive optimization warnings and undefined behavior.
+COMPILE-SWITCHES = -Wall -O1
 
 ##########################################################################
 % : %.f90 makefile;
@@ -14,7 +15,7 @@ COMPILE-SWITCHES = -Wall -O2
 	$(MINGW) -o $*.exe $(MINGW-SWITCHES) $*.f90 $(MINGWLIBS)
 ##########################################################################
 
-default : coldplaslog.exe libaccisWin.a
+default : coldplas.exe libaccisWin.a
 
 LIBS: libaccisX.a libaccisWin.a
 
