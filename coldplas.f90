@@ -17,7 +17,7 @@
 ! F^2 = (RL - PS)^2 \sin^4 \theta + 4 P^2 D^2 \cos^2 \theta
 ! is the discriminant, and is manifestly positive. 
 ! Solution is
-! N^2 = B\pm F/2A.
+! N^2 = B\pm F/2A. But it is better evaluated as N^2=2C/(B\mp F)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 module plasma
@@ -38,7 +38,7 @@ character*3 sangle
 character*8 string
 character*20 argument
 integer :: ikey=0
-real :: izero
+real :: izero,xnlower
 logical :: lEz=.false.,logx=.true.,logy=.true.
 
 data Aj/1.,1836./
@@ -79,14 +79,18 @@ subroutine evalN2
 end subroutine evalN2
 
 subroutine initialize
-  omega(1)=0.1*omegamax/nomega
+  if(logx)then
+     omega(1)=0.2*omegamax/nomega
+  else
+     omega(1)=omegamax/nomega
+  endif
   izero=nomega*alog(omega(1))/alog(omegamax/omega(1))
   do i=2,nomega
-!     if(logx)then
+     if(logx)then
         omega(i)=omega(1)*exp(alog(omegamax/omega(1))*(i-1.)/(nomega-1.))
-!     else
-!        omega(i)=i*omega(1)   !linear
-!     endif
+     else
+        omega(i)=i*omega(1)   !linear
+     endif
   enddo
 end subroutine initialize
 
@@ -95,8 +99,11 @@ subroutine markatomega(om,frac,trace,yinc,mychar)
   real, dimension(nomega) :: trace
   character*(*) mychar
   real, external :: wx2nx,wy2ny
-!  i=int(nomega*om/omegamax)   !linear
-  i=1+int(alog(om/omega(1))/alog(omegamax/omega(1))*(nomega-1.))
+  if(logx)then  !This switch does not work without consistency
+     i=1+int(alog(om/omega(1))/alog(omegamax/omega(1))*(nomega-1.))
+  else
+     i=int(om/omega(1))
+  endif
   if(i.le.nomega.and.i.gt.0)call jdrwstr(wx2nx(omega(i)),wy2ny(trace(i))+yinc,mychar,frac)
 end subroutine markatomega
 
@@ -110,7 +117,6 @@ subroutine savesettings
 end subroutine savesettings
 
 subroutine readsettings
-!  write(*,*)'iargc()=',iargc(),'key=',key
   open(12,file='coldplas.input',status='old',err=2)
   read(12,*,end=2,err=2)omegace,omegamax,N2min,N2max,ntheta
   write(*,'(a,4f10.3,i4)')'Read parameters',omegace,omegamax,N2min,N2max,ntheta
@@ -190,7 +196,7 @@ end subroutine uif
 
 subroutine annotations(thetadeg)
   implicit none
-  real :: thetadeg
+  real :: thetadeg,ynorm,oalfven
   real, external :: wx2nx,wy2ny
   ! Annotations
   call color(15)
@@ -200,7 +206,8 @@ subroutine annotations(thetadeg)
          call jdrwstr(wx2nx(omega(ntm-1)), &
               wy2ny(N2max)-.002*(100-thetadeg),'!Aq!@='//sangle,0.)
          call charangl(90.)
-         if(omega(ntm-1).lt.omegamax)call jdrwstr(wx2nx(omega(ntm-1)), &
+         if(omega(ntm-1).lt.omegamax.and.wx2nx(omega(ntm-1)).gt.xnlower) &
+              call jdrwstr(wx2nx(omega(ntm-1)), &
               wy2ny(N2max)-.002*(100-thetadeg),'Lower Hybrid',-1.5)
          call charangl(0.)
       else
@@ -221,18 +228,19 @@ subroutine annotations(thetadeg)
       call vecw(1.,N2max,1)
       call vecw(omega(1),0.,0)
       call vecw(omegamax,0.,1)
-      call jdrwstr(wx2nx(omegace),wy2ny(2*N2min),'!AW!@',0.)
-      call jdrwstr(wx2nx(omegace),wy2ny(2*N2min)-.022,'!A{!@',0.)
-      call jdrwstr(wx2nx(omegace),wy2ny(2*N2min)+.022,'!A}!@',0.)
+      ynorm=wy2ny(N2min)+.035
+      call jdrwstr(wx2nx(omegace),ynorm,'!AW!@',0.)
+      call jdrwstr(wx2nx(omegace),ynorm-.022,'!A{!@',0.)
+      call jdrwstr(wx2nx(omegace),ynorm+.022,'!A}!@',0.)
       if(omegace/Aj(2).ge.omega(2))then
-         call jdrwstr(wx2nx(omegace/Aj(2)),wy2ny(2*N2min),'!AW!@!di!d',0.)
-         call jdrwstr(wx2nx(omegace/Aj(2)),wy2ny(2*N2min)-.022,'!A{!@',0.)
-         call jdrwstr(wx2nx(omegace/Aj(2)),wy2ny(2*N2min)+.022,'!A}!@',0.)
+         call jdrwstr(wx2nx(omegace/Aj(2)),ynorm,'!AW!@!di!d',0.)
+         call jdrwstr(wx2nx(omegace/Aj(2)),ynorm-.022,'!A{!@',0.)
+         call jdrwstr(wx2nx(omegace/Aj(2)),ynorm+.022,'!A}!@',0.)
       endif
    elseif(abs(thetadeg).lt.1)then
       if(omegace.gt.1.02)call markatomega((omegace+1.3)/2.,-1.,Nplus,0.01,'R')
       call markatomega(1.+.1*omegace,-0.02,Nminus,-.002,'L')
-      if(wx2nx(omegace/Aj(2)).gt..17) &
+      if(wx2nx(omegace/Aj(2)).gt.xnlower) &
            call markatomega(0.7*omegace/Aj(2),1.2,Nplus,0.,'L')
 !      call markatomega(sqrt(omegace**2+1.),-2.,N2P,0.,'R')
       call markatomega(.85,0.,Nplus,-0.01,'L')
@@ -250,17 +258,16 @@ subroutine annotations(thetadeg)
       else
          call markatomega(.5*omegace,1.,Nminus,0.,' Electron cyclotron waves')
       endif
-      if(wx2nx(omegace/Aj(2)).gt..17)then
+      if(wx2nx(omegace/Aj(2)).gt.xnlower)then
          call markatomega(0.8*omegace/Aj(2),1.2,Nplus,0.,'Ion cyclotron waves')
       endif
-      if(wx2nx(omega(1)).lt.wx2nx(0.8*omegace/Aj(2))-.02)then
-         call markatomega(omega(1)+.05*omegace/Aj(2), &
-              -1.,Nminus,0.,'Alfven !A_!@')
-         call markatomega(omega(1)+.05*omegace/Aj(2), &
-              1.5,Nminus,0.,'Shear Alfven')
+      oalfven=omega(1)+.05*omegace/Aj(2)
+      if(wx2nx(oalfven).gt.xnlower)then
+         call markatomega(oalfven,-1.,Nminus,0.,'Alfven !A_!@')
+         call markatomega(oalfven,1.5,Nminus,0.,'Shear Alfven')
       endif
-      if(omega(1).lt.omegace/300.)then
-         call markatomega(omegace/300.,-1.,Nminus,0.,'Whistlers !A_!@')
+      if(wx2nx(omegace/250).gt.xnlower)then
+         call markatomega(omegace/250.,-1.,Nminus,0.,'Whistlers !A_!@')
       endif
       call winset(.false.)
       call winset(.true.)
@@ -350,6 +357,7 @@ else
    N2max=10.
 endif
 
+xnlower=.17
 ! Start of user interface loop.
 1 continue
 call initialize
@@ -377,7 +385,6 @@ do itheta=1,ntheta
    write(sangle,'(i2)')nint(thetadeg)
    call evalN2
    call findresonances
-!   write(*,*)omega(1),Nplus(1),omega(2),Nplus(2)
    call plotthesolutions(EyExmax,EzExmax)
    call color(15)
    call annotations(thetadeg)
@@ -393,7 +400,6 @@ endif
 call pfset(0)
 call eye3d(iw)
 call uif(iw)
-!write(*,*)'iw=',iw
 if(iw.ne.0)goto 1
 
 write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta      current values are'
