@@ -9,18 +9,18 @@ COMPILE-SWITCHES = -Wall -O1
 
 ##########################################################################
 % : %.f90 makefile;
-	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90  $(XLIBS)
+	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90  $(XLIBS) $(LIBS)
 
 %.exe : %.f90 makefile;
-	$(MINGW) -o $*.exe $(MINGW-SWITCHES) $*.f90 $(MINGWLIBS)
+	$(MINGW) -o $*.exe $(MINGW-SWITCHES) $*.f90 $(MINGWLIBS) $(LIBS)
 ##########################################################################
 
-default : coldplas.exe libaccisWin.a
+default : coldplas.exe libaccisWin.a $(LIBS)
 
 LIBS: libaccisX.a libaccisWin.a
 
-libaccisX.a :
+libaccisX.a : makefile
 	cp /home/hutch/accis/libaccisX.a .
 
-libaccisWin.a :
+libaccisWin.a : makefile
 	cp /home/hutch/accis/drivers/win64/libaccisWin.a .
