@@ -1,6 +1,6 @@
 
 FORTRAN=gfortran
-XLIBS = -L. -laccisX -lXt -lX11
+XLIBS = -L. -laccisX -lX11
 MINGW=i686-w64-mingw32-gfortran
 MINGW-SWITCHES= -H -mwindows -mconsole --static
 MINGWLIBS=-L. -laccisWin
@@ -8,19 +8,18 @@ MINGWLIBS=-L. -laccisWin
 COMPILE-SWITCHES = -Wall -O1
 
 ##########################################################################
-% : %.f90 makefile;
+% : %.f90 makefile libaccisX.a;
 	$(FORTRAN)  -o $* $(COMPILE-SWITCHES) $*.f90  $(XLIBS) $(LIBS)
 
 %.exe : %.f90 makefile;
 	$(MINGW) -o $*.exe $(MINGW-SWITCHES) $*.f90 $(MINGWLIBS) $(LIBS)
 ##########################################################################
 
-default : coldplas.exe libaccisWin.a $(LIBS)
+default : coldplas libaccisX.a
 
-LIBS: libaccisX.a libaccisWin.a
+windows : coldplas.exe libaccisWin.a
 
-libaccisX.a : makefile
+renewlibs :
 	cp /home/hutch/accis/libaccisX.a .
-
-libaccisWin.a : makefile
 	cp /home/hutch/accis/drivers/win64/libaccisWin.a .
+

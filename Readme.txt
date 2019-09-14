@@ -3,16 +3,16 @@ governing waves in a cold plasma. Its purpose is primarily
 pedagogical.  It is controlled from the keyboard, for which help can
 be obtained when it is running by hitting the key 'h'.
 
-To create an executable program on linux or Windows, a fortran
-compiler must be available.  The makefile is set up for the mingw
-cross-compiler to produce a Windows executable coldplas.exe, or for
-gfortran to produce a linux executable coldplaslog. Edit the makefile
-to replace MINGW or FORTRAN with references to your compiler. But it
-must be compatible with the gfortran/gcc compilers that produced the
-required and included graphics libaries libaccisX.a or libaccisWin.a.
+To create an executable program on linux type make, but you need
+gfortran and the X11 libraries accessible.  The makefile with 'make
+windows' is set up to use the mingw-32 cross-compiler to produce a
+Windows executable coldplas.exe.  Edit the makefile to replace MINGW
+or FORTRAN with references to your compiler. But it must be compatible
+with the gfortran/gcc compilers that produced the required and
+included graphics libaries libaccisX.a or libaccisWin.a.
 
-Alternatively just download and run the Windows executable:
-coldplas.exe. It runs perfectly in native Windows and the 'wine'
+Easiest is just to download and run the Windows complete executable:
+coldplas.exe. It runs perfectly in native Windows and under the 'Wine'
 system.
 
 On a Mac, to run coldplas.exe you can either install Wine free (se e.g
