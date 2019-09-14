@@ -254,6 +254,7 @@ subroutine annotations(thetadeg)
       if(omegace.ge.1.)then
          if(wy2ny(N2max).gt.wy2ny(2.)+.33) &
               call markatomega(.6,2.,Nminus,0.,'!Aw!@!dp!dcos!Aq!B{!@')
+         call markatomega(.2,1.,Nminus,0.,' Helicon or')
          call markatomega(.3,1.,Nminus,0.,' Whistler Branch')
       else
          call markatomega(.5*omegace,1.,Nminus,0.,' Electron cyclotron waves')
