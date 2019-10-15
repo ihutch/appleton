@@ -39,7 +39,7 @@ character*8 string
 character*20 argument
 integer :: ikey=0
 real :: izero,xnlower
-logical :: lEz=.false.,logx=.true.,logy=.true.
+logical :: lEz=.false.,logx=.true.,logy=.true.,lplotomega=.false.
 
 data Aj/1.,1836./
 data Zj/-1.,1./
@@ -66,16 +66,20 @@ subroutine evalN2
      N2P=2.*C/(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))
      N2M=2.*C/(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))
   else  ! This does not work well at low omega.
-  N2P=(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
-  N2M=(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
+     N2P=(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
+     N2M=(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
   endif
-  Nplus=sign(1.,N2P)*sqrt(abs(N2P))
-  Nminus=sign(1.,N2M)*sqrt(abs(N2M))
 ! Polarizations Ey/iEx and Ez/Ex.
   EyExP=D/(N2P-S)
   EyExM=D/(N2M-S)
   EzExP=N2P*sintheta*costheta/(N2P*sintheta**2-S)
   EzExM=N2M*sintheta*costheta/(N2M*sintheta**2-S)
+  if(lplotomega)then
+     N2P=N2P*omega**2
+     N2M=N2M*omega**2
+  endif
+  Nplus=sign(1.,N2P)*sqrt(abs(N2P))
+  Nminus=sign(1.,N2M)*sqrt(abs(N2M))
 end subroutine evalN2
 
 subroutine initialize
@@ -150,6 +154,7 @@ elseif(iw.eq.ichar('h'))then
    write(*,*)'B-value e=dec r=inc; p: print, v: save settings,'
    write(*,*)'Toggle polarization from Ey/Ex to Ez/Ex: z'
    write(*,*)'Toggle logarithmic axes: x, y'
+   write(*,*)'Toggle ordinate plotting from N to k: o'
    write(*,*)'w: wait, n: no-wait plotting, else quit'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
@@ -177,11 +182,13 @@ elseif(iw.eq.ichar('z'))then
    lEz=.not.lEz
 elseif(iw.eq.ichar('x'))then
    logx=.not.logx
+elseif(iw.eq.ichar('o'))then
+   lplotomega=.not.lplotomega
 elseif(iw.eq.ichar('y'))then
-   if(.not.logy)then; N2min=.1;   N2max=2000.
+   logy=.not.logy
+   if(logy)then; N2min=.1;   N2max=2000.
    else; N2min=-1.; N2max=10.
    endif
-   logy=.not.logy
 elseif(iw.eq.ichar('c'))then
 omegace=2.5
 omegamax=5.0001
@@ -278,32 +285,15 @@ subroutine annotations(thetadeg)
 
  subroutine findresonances
    implicit none
-! Ensure plotting of resonances
+! Ensure correct plotting of resonances by adjusting at gaps.
    ntm=nomega
-   ntp=nomega
-   ntp2=nomega
    do i=3,nomega ! Find the resonance gaps for plotting.
-      if(ntp.eq.nomega.and.N2P(i-1).gt.0.and.N2P(i).lt.0.)ntp=i
-      if(ntp.ne.nomega.and.N2P(i-1).gt.0.and.N2P(i).lt.0.)ntp2=i
-      if(ntm.eq.nomega.and.N2M(i-1).gt.1.and.N2M(i).lt.1.)then
-!         write(*,*)'A',A(i),' B',B(i),' C',C(i),' F2',F2(i)
-!         write(*,*)'S',S(i),' P',P(i),' D',D(i),' o',omega(i)
-!         write(*,*)i,ntm,N2M(i-1),N2M(i)
-         ntm=i
-      endif
+      if(ntm.eq.nomega.and.N2M(i-1).gt.1.and.N2M(i).lt.1.)ntm=i
+      if(Nminus(i-1).gt.0.and.Nminus(i).lt.0.)Nminus(i-1)=N2max
+      if(Nminus(i-1).lt.N2min.and.Nminus(i).gt.N2min)Nminus(i)=N2min
+      if(Nplus(i-1).gt.0.and.Nplus(i).lt.0)Nplus(i-1)=N2max
+      if(Nplus(i-1).lt.N2min.and.Nplus(i).gt.N2min)Nplus(i)=N2min
    enddo
-   if(ntp.ne.nomega)then
-      Nplus(ntp-1)=N2max
-      if(.not.logy)Nplus(ntp)=N2min
-   endif
-   if(ntp2.ne.nomega)then
-      Nplus(ntp2-1)=N2max
-      if(.not.logy)Nplus(ntp2)=N2min
-   endif
-   if(ntm.ne.nomega)then
-      Nminus(ntm-1)=N2max
-      if(.not.logy)Nminus(ntm)=N2min
-   endif
  end subroutine findresonances
 
  subroutine plotthesolutions(EyExmax,EzExmax)
@@ -374,9 +364,18 @@ endif
 call scalewn(omega(1),omega(nomega),N2min,N2max,logx,logy)
 call axis()
 call axis2
-call axlabels('!Aw!@/!Aw!@!dp!d','N')
-if(N2min.lt.0.)call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max), &
+if(lplotomega)then
+   call axlabels('!Aw!@/!Aw!@!dp!d','kc/!Aw!@!dp!d')
+   if(N2min.lt.0.)then
+      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max),'-|k!u2!u|!u1/2!u',0.)
+      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.01,'_______',0.)
+      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.033,'!Aw!@!dp!d/c',0.)
+   endif
+else
+   call axlabels('!Aw!@/!Aw!@!dp!d','N')
+   if(N2min.lt.0.)call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max), &
      '-|N!u2!u|!u1/2!u',0.)
+endif
 call boxtitle('!Aq!@=0: !p!n-!n!qRight-hand, !p!n-!n!qLeft-hand; !Aq!@=90: !p!n-!n!qOrdinary, !p!n-!n!qExtraordinary') 
 call winset(.true.)
 do itheta=1,ntheta
