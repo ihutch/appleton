@@ -27,6 +27,7 @@ integer :: ispecies,i,itheta,ntheta,iw,ipf
 integer :: ntp,ntm,ntp2
 real, dimension(nspecies) :: nj,Aj,Zj
 real :: omegace,omegamax,domce   ! over omegape.
+real :: omegfac=0.2              ! Factor for log omega minumum.
 real :: N2min,N2max
 real, dimension(nomega) :: S,D,P,R,L,A,B,C,F2,resfac
 real, dimension(nomega) ::  N2P,N2M,omega,X,Y,Nplus,Nminus
@@ -84,7 +85,7 @@ end subroutine evalN2
 
 subroutine initialize
   if(logx)then
-     omega(1)=0.2*omegamax/nomega
+     omega(1)=omegfac*omegamax/nomega
   else
      omega(1)=omegamax/nomega
   endif
@@ -150,7 +151,8 @@ elseif(iw.eq.ichar('p'))then
 elseif(iw.eq.ichar('h'))then
    write(*,*)'Usage coldplas [<key> ... ]'
    write(*,*)'Keyboard graph-control keys as follows'
-   write(*,*)'y-range up/k down/l; x-range left/s right/d' 
+   write(*,*)'Shift y-range up/k down/l; x-range left/s right/d'
+   write(*,*)'y-range expand/:u contract:i; x-range (log) expnd:n cntrct:m d' 
    write(*,*)'B-value e=dec r=inc; p: print, v: save settings,'
    write(*,*)'Toggle polarization from Ey/Ex to Ez/Ex: z'
    write(*,*)'Toggle logarithmic axes: x, y'
@@ -174,6 +176,14 @@ elseif(iw.eq.65363.or.iw.eq.ichar('d'))then
    else
       if(omegamax.lt.3.*omegace)omegamax=omegamax*2.
    endif
+elseif(iw.eq.ichar('n'))then
+   omegfac=omegfac/2.
+elseif(iw.eq.ichar('m'))then
+   omegfac=omegfac*2.
+elseif(iw.eq.ichar('u'))then
+   N2min=N2min/2.
+elseif(iw.eq.ichar('i'))then
+   N2min=N2min*2.
 elseif(iw.eq.ichar('w'))then
    ipf=abs(ipf)
 elseif(iw.eq.ichar('n'))then
