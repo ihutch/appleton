@@ -28,12 +28,17 @@ integer :: ntp,ntm,ntp2
 real, dimension(nspecies) :: nj,Aj,Zj
 real :: omegace,omegamax,domce   ! over omegape.
 real :: omegfac=0.2              ! Factor for log omega minumum.
-real :: N2min,N2max
+real :: N2min,N2max,EyExmax,EzExmax,thetadeg
 real, dimension(nomega) :: S,D,P,R,L,A,B,C,F2,resfac
 real, dimension(nomega) ::  N2P,N2M,omega,X,Y,Nplus,Nminus
 real, dimension(nomega) :: EyExP,EzExP,EyExM,EzExM 
 real :: theta,sintheta,costheta
 character*3 sangle
+real, external :: wy2ny
+! Coldperp extra variables
+logical, dimension(nomega) :: logic
+real :: N2a,Npmax,Na
+complex, dimension(nomega) :: CN2P,CN2M
 
 ! Control parameters:
 character*8 string
@@ -82,7 +87,39 @@ subroutine evalN2
   Nplus=sign(1.,N2P)*sqrt(abs(N2P))
   Nminus=sign(1.,N2M)*sqrt(abs(N2M))
 end subroutine evalN2
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine evalNperp2
+  S=1. ; D=0.; P=1.
+  do ispecies=1,nspecies
+     S=S-nj(ispecies)/&
+          (Aj(ispecies)*omega**2-Zj(ispecies)**2*omegace**2/Aj(ispecies))
+     D=D- (Zj(ispecies)*omegace/(Aj(ispecies)*omega))* nj(ispecies)/&
+          (Aj(ispecies)*omega**2-Zj(ispecies)**2*omegace**2/Aj(ispecies))
+     P=P- nj(ispecies)/(Aj(ispecies)*omega)**2     
+  enddo
+  R=S+D
+  L=S-D
+  A=S
+  B=(S-N2a)*(S+P)-D**2
+  C=P*((S-N2a)**2-D**2)
+  F2=B**2-4.*A*C
+     !     resfac=(omegace-omega)*(omega*Aj(2)-omegace)
+  resfac=1.
+  CN2P=(B*resfac+sqrt(F2*resfac**2))/(2.*A*resfac)
+  CN2M=(B*resfac-sqrt(F2*resfac**2))/(2.*A*resfac)
+  where(F2.lt.0)
+     N2P=0.
+     N2M=0.
+  elsewhere(real(CN2P).gt.real(CN2m))
+     N2P=real(CN2P)
+     N2M=real(CN2M)
+  elsewhere
+     N2P=real(CN2M)
+     N2M=real(CN2P)
+  endwhere
+  !write(*,'(6f10.4)')(omega(i),A(i),B(i),C(i),F2(i),N2P(i),i=1,nomega)
+end subroutine evalNperp2
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine initialize
   if(logx)then
      omega(1)=omegfac*omegamax/nomega
@@ -98,7 +135,7 @@ subroutine initialize
      endif
   enddo
 end subroutine initialize
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine markatomega(om,frac,trace,yinc,mychar)
   real om,frac,yinc
   real, dimension(nomega) :: trace
@@ -210,7 +247,7 @@ else
    iw=0
 endif
 end subroutine uif
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine annotations(thetadeg)
   implicit none
   real :: thetadeg,ynorm,oalfven
@@ -271,8 +308,12 @@ subroutine annotations(thetadeg)
       if(omegace.ge.1.)then
          if(wy2ny(N2max).gt.wy2ny(2.)+.33) &
               call markatomega(.6,2.,Nminus,0.,'!Aw!@!dp!dcos!Aq!B{!@')
-         call markatomega(.2,1.,Nminus,0.,' Helicon or')
-         call markatomega(.3,1.,Nminus,0.,' Whistler Branch')
+         if(logx.or.omegamax.lt.4.)then
+            call charangl(70.)
+            call markatomega(.1,1.,Nminus,0.,' Helicon or')
+            call markatomega(.16,1.,Nminus,0.,' Whistler Branch')
+            call charangl(90.)
+         endif
       else
          call markatomega(.5*omegace,1.,Nminus,0.,' Electron cyclotron waves')
       endif
@@ -285,14 +326,20 @@ subroutine annotations(thetadeg)
          call markatomega(oalfven,1.5,Nminus,0.,'Shear Alfven')
       endif
       if(wx2nx(omegace/250).gt.xnlower)then
-         call markatomega(omegace/250.,-1.,Nminus,0.,'Whistlers !A_!@')
+!         call markatomega(omegace/250.,-1.,Nminus,0.,'Whistlers !A_!@')
+         call charangl(0.)
+         if(lplotomega)then
+            call markatomega(omegace/200.,1.,Nminus,-0.01,'Whistlers')
+         else
+            call markatomega(omegace/200.,-1.,Nminus,-0.01,'Whistlers')
+         endif
       endif
       call winset(.false.)
       call winset(.true.)
       call charangl(0.)
    endif
  end subroutine annotations
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine findresonances
    implicit none
 ! Ensure correct plotting of resonances by adjusting at gaps.
@@ -305,7 +352,7 @@ subroutine annotations(thetadeg)
       if(Nplus(i-1).lt.N2min.and.Nplus(i).gt.N2min)Nplus(i)=N2min
    enddo
  end subroutine findresonances
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine plotthesolutions(EyExmax,EzExmax)
    real :: EyExmax,EzExmax
    if(lEz)then
@@ -328,40 +375,8 @@ subroutine annotations(thetadeg)
            int(1+min(.99,abs(EyExM)/EyExmax)*240.),Nminus.le.0.5)
    endif
  end subroutine plotthesolutions
- 
-end module plasma
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! Has to be after the plasma module in this file.
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-program coldplas
-use plasma
-
-!Defaults
-omegace=2.5
-domce=0.1
-omegamax=5.0001
-ipf=0
-EyExmax=2.8
-EzExmax=2.8
-ntheta=10
-
-! Handle command line arguments and settings.
-call readsettings
-call pfset(ipf)
-call brgwscaled(0.,.9)
-if(.not.logx)then; omegamax=3.5; else; omegamax=5.0001; endif
-if(logy)then
-   N2min=1.e-1
-   N2max=2000.
-else
-   N2min=-1.
-   N2max=10.
-endif
-
-xnlower=.17
-! Start of user interface loop.
-1 continue
-call initialize
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+subroutine plotNs
 call axregion(.15,.88,.1,.7)
 call pltinit(0.,omega(nomega),N2min,N2max)
 call charsize(.018,.018)
@@ -401,13 +416,49 @@ do itheta=1,ntheta
 enddo
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 call prtend('')
+end subroutine plotNs
+
+end module plasma
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Has to be after the plasma module in this file.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+program coldplas
+use plasma
+
+!Defaults
+omegace=2.5
+domce=0.1
+omegamax=5.0001
+ipf=0
+EyExmax=2.8
+EzExmax=2.8
+ntheta=10
+
+! Handle command line arguments and settings.
+call readsettings
+call pfset(ipf)
+call brgwscaled(0.,.9)
+if(.not.logx)then; omegamax=3.5; else; omegamax=5.0001; endif
+if(logy)then
+   N2min=1.e-1
+   N2max=2000.
+else
+   N2min=-1.
+   N2max=10.
+endif
+
+xnlower=.17
+! Start of user interface loop.
+
+1 continue
+call initialize
+call plotNs
 if(ipf.lt.0)then
    call savesettings
    call exit()
 endif
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! User interface.
 call pfset(0)
+! User interface.
 call eye3d(iw)
 call uif(iw)
 if(iw.ne.0)goto 1
