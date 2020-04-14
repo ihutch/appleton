@@ -1,6 +1,7 @@
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Cold plasma dispersion relation. Appleton-Hartree display.
 ! Frequency on logarithmic axis, plotting N rather than N^2
+! for various angles of propagation theta.
 ! Variables:
 ! Frequencies normalized to omegape. omega. omegace (positive) (=>B).
 ! Species of mass Aj (times electron mass), density nj (times electron den)
@@ -18,6 +19,18 @@
 ! is the discriminant, and is manifestly positive. 
 ! Solution is
 ! N^2 = B\pm F/2A. But it is better evaluated as N^2=2C/(B\mp F)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Alternative display of dispersion relation
+! N_\perp^2 for various given N_\parallel^2
+! Variables:
+! Parallel refractive index squared N2a, Perp squared N2e
+! A = S
+! B = (S-N2a)*(S+P)-D^2
+! C = P*[(S-N2a)^2 -D^2]
+! F^2 = B^2 -4AC
+! is the discriminant, and may be negative, giving complex N2e
+! Solution is
+! N2e^2 = (B\pm F)/2A.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 module plasma
@@ -37,16 +50,15 @@ character*3 sangle
 real, external :: wy2ny,wx2nx
 ! Coldperp extra variables
 logical, dimension(nomega) :: logic
-logical :: lperp=.true.
-real :: N2a,Npmax=5,Na
+logical :: lperp=.false.
+real :: N2a,Npmax=5,Na,olh,ouh
 integer :: colorfast=2,colorslow=1
 complex, dimension(nomega) :: CN2P,CN2M
-
 ! Control parameters:
 character*8 string
 character*20 argument
 integer :: ikey=0
-real :: izero,xnlower,olh,ouh
+real :: izero,xnlower=.17
 logical :: lEz=.false.,logx=.true.,logy=.true.,lplotomega=.false.
 
 data Aj/1.,1836./
@@ -119,8 +131,9 @@ subroutine evalNperp2
      N2P=real(CN2M)
      N2M=real(CN2P)
   endwhere
-  !write(*,'(6f10.4)')(omega(i),A(i),B(i),C(i),F2(i),N2P(i),i=1,nomega)
 end subroutine evalNperp2
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Various utilities
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine initialize ! Only the scope and omega arrays.
   if(logx)then
@@ -172,6 +185,7 @@ subroutine readsettings
   read(12,*,end=2,err=2)ipf
 2 continue
   close(12)
+! Parse commandline arguments, single characters passed to uif.
   do i=1,iargc()
      call getarg(i,argument)
      ikey=ichar(argument(1:1))
@@ -179,11 +193,33 @@ subroutine readsettings
   enddo
   if(ipf.ne.0)write(*,*)'Nonstop plotting',ipf
   if(ikey.ne.0)call savesettings    ! If key was a valid command
+! Decide default plot ranges.
+  if(.not.logx)then; omegamax=3.5; else; omegamax=5.0001
+  endif
+  if(logy)then; N2min=1.e-1; N2max=2000. ;
+  else; N2min=-1. ; N2max=10. ;
+  endif
 end subroutine readsettings
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ subroutine findresonances
+   implicit none
+! Ensure correct plotting of resonances by adjusting at gaps.
+   ntm=nomega
+   do i=3,nomega ! Find the resonance gaps for plotting.
+      if(ntm.eq.nomega.and.N2M(i-1).gt.1.and.N2M(i).lt.1.)ntm=i
+      if(Nminus(i-1).gt.0.and.Nminus(i).lt.0.)Nminus(i-1)=N2max
+      if(Nminus(i-1).lt.N2min.and.Nminus(i).gt.N2min)Nminus(i)=N2min
+      if(Nplus(i-1).gt.0.and.Nplus(i).lt.0)Nplus(i-1)=N2max
+      if(Nplus(i-1).lt.N2min.and.Nplus(i).gt.N2min)Nplus(i)=N2min
+   enddo
+ end subroutine findresonances
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! User interface
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine uif(iw)
 ! User interface routine
   integer :: iw
+call pfset(0) ! By default each new plot is not printed?
 if(iw.eq.ichar('r'))then
    if(domce.lt..034*omegace)domce=domce*10.
    omegace=omegace+domce
@@ -194,15 +230,15 @@ elseif(iw.eq.ichar('p'))then
    call pfset(3)
 elseif(iw.eq.ichar('h'))then
    write(*,*)'Usage coldplas [<key> ... ]'
-   write(*,*)'Keyboard graph-control keys as follows'
-   write(*,*)'Shift y-range up/k down/l; x-range left/s right/d'
-   write(*,*)'y-range expand:u contract:i; x-range (log) expnd:n cntrct:m d' 
-   write(*,*)'B-value e=decrs r=incrs; p: print, v: save settings,'
-   write(*,*)'Toggle polarization from Ey/Ex to Ez/Ex:z'
-   write(*,*)'Toggle logarithmic axes: x, y.',' Toggle Nperp, N plotting:\'
-   write(*,*)'Toggle ordinate plotting from N to k:o'
-   write(*,*)'At end of plotting wait: w, no-wait: a.',' Tell parameters: b'
-   write(*,*)'To quit: q or single left click in window.'
+   write(*,*)'Keyboard and command line graph-control keys as follows'
+   write(*,*)'Y-RANGE SHIFT: up/k down/l; X-RANGE: left/s right/d'
+   write(*,*)'Y-RANGE EXPAND:u contract:i; X-RANGE (log) expnd:n cntrct:m d' 
+   write(*,*)'B-VALUE e=decrs r=incrs; PRINT: p, SAVE settings: v,'
+   write(*,*)'POLARIZATION toggle from Ey/Ex to Ez/Ex: z'
+   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle:\'
+   write(*,*)'ORDINATE plotting toggle from N to k:o'
+   write(*,*)'WAIT at end of plotting: w, NO-WAIT: a.',' TELL parameters: b'
+   write(*,*)'QUIT: q or single left click in window.'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
    N2min=2.*N2min
@@ -247,10 +283,10 @@ elseif(iw.eq.ichar('y'))then
       if(lperp)then; N2max=600.;N2min=-60.; else; N2min=-1.; N2max=10.;endif
    endif
 elseif(iw.eq.ichar('c'))then
-omegace=2.5
-omegamax=5.0001
-N2min=1.e-1
-N2max=8000.
+   omegace=2.5
+   omegamax=5.0001
+   N2min=1.e-1
+   N2max=8000.
 elseif(iw.eq.ichar('v'))then
    call savesettings
 elseif(iw.eq.ichar('\'))then
@@ -264,6 +300,8 @@ elseif(iw.eq.ichar('b'))then
 else
 endif
 end subroutine uif
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Plotting and Annotating 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine annotations
   implicit none
@@ -385,19 +423,6 @@ subroutine annotations
    call polyline((/olh,olh/),(/N2min,N2max/),2)
    call color(15)
  end subroutine annotationperp
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
- subroutine findresonances
-   implicit none
-! Ensure correct plotting of resonances by adjusting at gaps.
-   ntm=nomega
-   do i=3,nomega ! Find the resonance gaps for plotting.
-      if(ntm.eq.nomega.and.N2M(i-1).gt.1.and.N2M(i).lt.1.)ntm=i
-      if(Nminus(i-1).gt.0.and.Nminus(i).lt.0.)Nminus(i-1)=N2max
-      if(Nminus(i-1).lt.N2min.and.Nminus(i).gt.N2min)Nminus(i)=N2min
-      if(Nplus(i-1).gt.0.and.Nplus(i).lt.0)Nplus(i-1)=N2max
-      if(Nplus(i-1).lt.N2min.and.Nplus(i).gt.N2min)Nplus(i)=N2min
-   enddo
- end subroutine findresonances
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine plotthesolutions(EyExmax,EzExmax)
    real :: EyExmax,EzExmax
@@ -473,10 +498,10 @@ subroutine plotNs
      thetadeg=180.*theta/3.1415926
      write(sangle,'(i2)')nint(thetadeg)
      call evalN2
-     call annotations
      call findresonances
      call plotthesolutions(EyExmax,EzExmax)
      call color(15)
+     call annotations ! Must be after findresonances
   enddo
   call prtend('')
 end subroutine plotNs
@@ -484,7 +509,7 @@ end subroutine plotNs
 subroutine plotNperps
   real dxa,dya,xleg
   call setupplots
-  call boxtitle('N!d!A`!@!d for N!d!A|!@!d given by line lables')
+  call boxtitle('N!d!A`!@!d for N!d!A|!@!d given by line labels')
   call winset(.true.)
   call color(15)
   if(.not.logy)call polyline((/omega(1),omega(nomega)/),(/1.,1./),2)
@@ -494,9 +519,7 @@ subroutine plotNperps
      N2a=Na**2
      thetadeg=45.
      call evalNperp2
-     !     write(*,*)'iNpar,Na,N2a',iNpar,Na,N2a
      call color(15)
-     !   write(*,'(4f8.4)')(omega(i),S(i),N2P(i),N2M(i),i=1,nomega)
      call fwrite(Na,iw,1,string)
      logic=.true.
      where(F2.le.0. .and. cshift(F2,1).gt.0.)
@@ -551,7 +574,7 @@ use plasma
 !Defaults
 omegace=2.5
 domce=0.1
-omegamax=5.0001
+! Now set in readsettings omegamax=5.0001
 ipf=0
 EyExmax=2.8
 EzExmax=2.8
@@ -560,19 +583,12 @@ Npmax=5
 
 ! Handle command line arguments and settings.
 call readsettings
+! Plotting settings initialization
 call pfset(ipf)
 call brgwscaled(0.,.9)
-if(.not.logx)then; omegamax=3.5; else; omegamax=5.0001; endif
-if(logy)then
-   N2min=1.e-1
-   N2max=2000.
-else
-   N2min=-1.
-   N2max=10.
-endif
-xnlower=.17
+call setiwarn(0) ! Silence range warnings
 
-! Start of user interface loop.
+! Start user interface loop.
 1 continue
 
 call initialize
@@ -581,16 +597,16 @@ if(lperp)then
 else
    call plotNs
 endif
+
 if(ipf.lt.0)then  ! If in no-wait plotting mode always save settings.
    call savesettings
    call exit()
 endif
-call pfset(0)
-! User interface.
+
 call eye3d(iw)
 call uif(iw)
 if(iw.ne.0)goto 1
+! End of user interface loop
 
-!write(*,*)'Append a further integer parameter -3 to print plot without stopping.'
 end program coldplas
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

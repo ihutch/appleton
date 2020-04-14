@@ -5,7 +5,7 @@ MINGW=i686-w64-mingw32-gfortran
 MINGW-SWITCHES= -H -mwindows -mconsole --static
 MINGWLIBS=-L. -laccisWin
 # -02 provoked aggressive optimization warnings and undefined behavior.
-COMPILE-SWITCHES = -Wall -O1 -g
+COMPILE-SWITCHES = -Wall -O1 
 
 ##########################################################################
 % : %.f90 makefile libaccisX.a;
