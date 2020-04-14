@@ -23,7 +23,7 @@
 module plasma
 implicit none
 integer, parameter :: nspecies=2,nomega=2000
-integer :: ispecies,i,itheta,ntheta,iw,ipf
+integer :: ispecies,i,itheta,ntheta,iw,ipf,iNpar,nNpar=10
 integer :: ntp,ntm,ntp2
 real, dimension(nspecies) :: nj,Aj,Zj
 real :: omegace,omegamax,domce   ! over omegape.
@@ -34,17 +34,19 @@ real, dimension(nomega) ::  N2P,N2M,omega,X,Y,Nplus,Nminus
 real, dimension(nomega) :: EyExP,EzExP,EyExM,EzExM 
 real :: theta,sintheta,costheta
 character*3 sangle
-real, external :: wy2ny
+real, external :: wy2ny,wx2nx
 ! Coldperp extra variables
 logical, dimension(nomega) :: logic
-real :: N2a,Npmax,Na
+logical :: lperp=.true.
+real :: N2a,Npmax=5,Na
+integer :: colorfast=2,colorslow=1
 complex, dimension(nomega) :: CN2P,CN2M
 
 ! Control parameters:
 character*8 string
 character*20 argument
 integer :: ikey=0
-real :: izero,xnlower
+real :: izero,xnlower,olh,ouh
 logical :: lEz=.false.,logx=.true.,logy=.true.,lplotomega=.false.
 
 data Aj/1.,1836./
@@ -120,7 +122,7 @@ subroutine evalNperp2
   !write(*,'(6f10.4)')(omega(i),A(i),B(i),C(i),F2(i),N2P(i),i=1,nomega)
 end subroutine evalNperp2
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine initialize
+subroutine initialize ! Only the scope and omega arrays.
   if(logx)then
      omega(1)=omegfac*omegamax/nomega
   else
@@ -141,14 +143,19 @@ subroutine markatomega(om,frac,trace,yinc,mychar)
   real, dimension(nomega) :: trace
   character*(*) mychar
   real, external :: wx2nx,wy2ny
-  if(logx)then  !This switch does not work without consistency
-     i=1+int(alog(om/omega(1))/alog(omegamax/omega(1))*(nomega-1.))
-  else
-     i=int(om/omega(1))
-  endif
+  i=iatomega(om)
   if(i.le.nomega.and.i.gt.0)call jdrwstr(wx2nx(omega(i)),wy2ny(trace(i))+yinc,mychar,frac)
 end subroutine markatomega
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+integer function iatomega(om)
+  real om
+  if(logx)then  !This switch does not work without consistency
+     iatomega=1+int(alog(om/omega(1))/alog(omegamax/omega(1))*(nomega-1.))
+  else
+     iatomega=int(om/omega(1))
+  endif  
+end function iatomega
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine savesettings
   open(13,file='coldplas.input',status='unknown')
   write(13,'(4f10.5,i4)')omegace,omegamax,N2min,N2max,ntheta
@@ -157,7 +164,7 @@ subroutine savesettings
   write(13,*)' key    k,l y-range; s,d x-range; r,e B-value'
   close(13)
 end subroutine savesettings
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine readsettings
   open(12,file='coldplas.input',status='old',err=2)
   read(12,*,end=2,err=2)omegace,omegamax,N2min,N2max,ntheta
@@ -173,7 +180,7 @@ subroutine readsettings
   if(ipf.ne.0)write(*,*)'Nonstop plotting',ipf
   if(ikey.ne.0)call savesettings    ! If key was a valid command
 end subroutine readsettings
-
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine uif(iw)
 ! User interface routine
   integer :: iw
@@ -189,12 +196,13 @@ elseif(iw.eq.ichar('h'))then
    write(*,*)'Usage coldplas [<key> ... ]'
    write(*,*)'Keyboard graph-control keys as follows'
    write(*,*)'Shift y-range up/k down/l; x-range left/s right/d'
-   write(*,*)'y-range expand/:u contract:i; x-range (log) expnd:n cntrct:m d' 
-   write(*,*)'B-value e=dec r=inc; p: print, v: save settings,'
-   write(*,*)'Toggle polarization from Ey/Ex to Ez/Ex: z'
-   write(*,*)'Toggle logarithmic axes: x, y'
-   write(*,*)'Toggle ordinate plotting from N to k: o'
-   write(*,*)'w: wait, n: no-wait plotting, else quit'
+   write(*,*)'y-range expand:u contract:i; x-range (log) expnd:n cntrct:m d' 
+   write(*,*)'B-value e=decrs r=incrs; p: print, v: save settings,'
+   write(*,*)'Toggle polarization from Ey/Ex to Ez/Ex:z'
+   write(*,*)'Toggle logarithmic axes: x, y.',' Toggle Nperp, N plotting:\'
+   write(*,*)'Toggle ordinate plotting from N to k:o'
+   write(*,*)'At end of plotting wait: w, no-wait: a.',' Tell parameters: b'
+   write(*,*)'To quit: q or single left click in window.'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
    N2min=2.*N2min
@@ -223,7 +231,7 @@ elseif(iw.eq.ichar('i'))then
    N2min=N2min*2.
 elseif(iw.eq.ichar('w'))then
    ipf=abs(ipf)
-elseif(iw.eq.ichar('n'))then
+elseif(iw.eq.ichar('a'))then
    ipf=-3
 elseif(iw.eq.ichar('z'))then
    lEz=.not.lEz
@@ -233,8 +241,10 @@ elseif(iw.eq.ichar('o'))then
    lplotomega=.not.lplotomega
 elseif(iw.eq.ichar('y'))then
    logy=.not.logy
-   if(logy)then; N2min=.1;   N2max=2000.
-   else; N2min=-1.; N2max=10.
+   if(logy)then
+      N2min=.1;   N2max=2000.
+   else
+      if(lperp)then; N2max=600.;N2min=-60.; else; N2min=-1.; N2max=10.;endif
    endif
 elseif(iw.eq.ichar('c'))then
 omegace=2.5
@@ -243,14 +253,21 @@ N2min=1.e-1
 N2max=8000.
 elseif(iw.eq.ichar('v'))then
    call savesettings
-else
+elseif(iw.eq.ichar('\'))then
+   lperp=.not.lperp
+elseif(iw.eq.ichar('q'))then
    iw=0
+elseif(iw.eq.ichar('b'))then
+   write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta  current values'
+   write(*,'(4f10.4,i4)')omegace,omegamax,N2min,N2max,ntheta
+
+else
 endif
 end subroutine uif
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine annotations(thetadeg)
+subroutine annotations
   implicit none
-  real :: thetadeg,ynorm,oalfven
+  real :: ynorm,oalfven
   real, external :: wx2nx,wy2ny
   ! Annotations
   call color(15)
@@ -334,11 +351,40 @@ subroutine annotations(thetadeg)
             call markatomega(omegace/200.,-1.,Nminus,-0.01,'Whistlers')
          endif
       endif
-      call winset(.false.)
-      call winset(.true.)
       call charangl(0.)
    endif
  end subroutine annotations
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ subroutine annotationperp
+   external wy2ny,wx2nx
+   real wy2ny,wx2nx,ynorm
+   ynorm=wy2ny(N2min)+.035
+   ouh=sqrt(omegace**2+1.)
+   call jdrwstr(wx2nx(ouh),ynorm,'!Aw!@!duh!d',1.2)
+   call jdrwstr(wx2nx((-(1-Aj(1)/Aj(2))*omegace &
+        +sqrt(omegace**2*(1+Aj(1)/Aj(2))**2+4.*(1+Aj(1)/Aj(2))))/2.),&
+        ynorm,'!Aw!@!dL!d!A{!@',-.75)
+   call jdrwstr(wx2nx(ouh),ynorm,'!A}!@',0.)
+   call jdrwstr(wx2nx(omegace),ynorm,'!AW!@',-1.5)
+   call jdrwstr(wx2nx(omegace),ynorm-0.012,'!A{!@',0.)
+   call jdrwstr(wx2nx(omegace),ynorm+0.012,'!A}!@',0.)
+   if(omegace/Aj(2).ge.omega(2))then
+      call jdrwstr(wx2nx(omegace/Aj(2)),ynorm,'!AW!@!di!d',0.)
+      call jdrwstr(wx2nx(omegace/Aj(2)),ynorm-.022,'!A{!@',0.)
+      call jdrwstr(wx2nx(omegace/Aj(2)),ynorm+.022,'!A}!@',0.)
+   endif
+   ! Lower hybrid frequency for single ion species.
+   olh=((1.+Aj(1)/Aj(2))+omegace**2*(1+(Aj(1)/Aj(2))**2))/2.
+   olh=olh-sqrt((((1.-Aj(1)/Aj(2))+omegace**2*(1-(Aj(1)/Aj(2))**2))/2.)**2&
+        +1./Aj(2))
+   olh=sqrt(olh)
+   call jdrwstr(wx2nx(olh),ynorm,'!A}!@',0)
+   call drcstr('!Aw!@!dLH!d')
+   call color(colorslow)
+   call polyline((/ouh,ouh/),(/N2min,N2max/),2)
+   call polyline((/olh,olh/),(/N2min,N2max/),2)
+   call color(15)
+ end subroutine annotationperp
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine findresonances
    implicit none
@@ -375,48 +421,125 @@ subroutine annotations(thetadeg)
            int(1+min(.99,abs(EyExM)/EyExmax)*240.),Nminus.le.0.5)
    endif
  end subroutine plotthesolutions
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+ subroutine setupplots
+   call axregion(.15,.88,.1,.7)
+   call pltinit(0.,omega(nomega),N2min,N2max)
+   call charsize(.018,.018)
+   if(.not.lperp)then
+      call gradlegend(0.,EyExmax,1.04,0.,1.04,1.,.01,.true.)
+      if(lEz)then
+         call legendline(1.045,0.45,258,'|E!dz!d/E!dx!d|')
+      else
+         call legendline(1.045,0.45,258,'|E!dy!d/E!dx!d|')
+      endif
+   endif
+   call scalewn(omega(1),omega(nomega),N2min,N2max,logx,logy)
+   call axis()
+   call axis2
+   if(lplotomega)then
+      if(lperp)then
+         call axlabels('!Aw!@/!Aw!@!dp!d','k!d!A`!@!dc/!Aw!@!dp!d')
+      else
+         call axlabels('!Aw!@/!Aw!@!dp!d','kc/!Aw!@!dp!d')
+      endif
+      if(N2min.lt.0.)then
+         call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max),'-|k!u2!u|!u1/2!u',0.)
+         call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.01,'_______',0.)
+         call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.033,'!Aw!@!dp!d/c',0.)
+      endif
+   else
+      if(lperp)then
+         call axlabels('!Aw!@/!Aw!@!dp!d','N!d!a`!@!d')
+         if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.)-.035, &
+           '-|N!d!A`!@!d!u2!u|!u1/2!u',-1.1)
+               
+      else
+         call axlabels('!Aw!@/!Aw!@!dp!d','N')
+         if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.97*N2min+0.03*N2max), &
+           '-|N!u2!u|!u1/2!u',0.-1.1)
+      endif
+   endif
+ end subroutine setupplots
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
 subroutine plotNs
-call axregion(.15,.88,.1,.7)
-call pltinit(0.,omega(nomega),N2min,N2max)
-call charsize(.018,.018)
-call gradlegend(0.,EyExmax,1.04,0.,1.04,1.,.01,.true.)
-if(lEz)then
-   call legendline(1.045,0.45,258,'|E!dz!d/E!dx!d|')
-else
-   call legendline(1.045,0.45,258,'|E!dy!d/E!dx!d|')
-endif
-call scalewn(omega(1),omega(nomega),N2min,N2max,logx,logy)
-call axis()
-call axis2
-if(lplotomega)then
-   call axlabels('!Aw!@/!Aw!@!dp!d','kc/!Aw!@!dp!d')
-   if(N2min.lt.0.)then
-      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max),'-|k!u2!u|!u1/2!u',0.)
-      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.01,'_______',0.)
-      call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max)-.033,'!Aw!@!dp!d/c',0.)
-   endif
-else
-   call axlabels('!Aw!@/!Aw!@!dp!d','N')
-   if(N2min.lt.0.)call jdrwstr(0.08,wy2ny(0.97*N2min+0.03*N2max), &
-     '-|N!u2!u|!u1/2!u',0.)
-endif
-call boxtitle('!Aq!@=0: !p!n-!n!qRight-hand, !p!n-!n!qLeft-hand; !Aq!@=90: !p!n-!n!qOrdinary, !p!n-!n!qExtraordinary') 
-call winset(.true.)
-do itheta=1,ntheta
-   theta=3.1415926*(itheta-1.)/(ntheta-1.)/2.
-   sintheta=sin(theta) ; costheta=cos(theta)
-   thetadeg=180.*theta/3.1415926
-   write(sangle,'(i2)')nint(thetadeg)
-   call evalN2
-   call findresonances
-   call plotthesolutions(EyExmax,EzExmax)
-   call color(15)
-   call annotations(thetadeg)
-enddo
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-call prtend('')
+  call setupplots
+  call boxtitle('!Aq!@=0: !p!n-!n!qRight-hand, !p!n-!n!qLeft-hand;'// &
+      '!Aq!@=90: !p!n-!n!qOrdinary, !p!n-!n!qExtraordinary')
+  call winset(.true.)
+  do itheta=1,ntheta
+     theta=3.1415926*(itheta-1.)/(ntheta-1.)/2.
+     sintheta=sin(theta) ; costheta=cos(theta)
+     thetadeg=180.*theta/3.1415926
+     write(sangle,'(i2)')nint(thetadeg)
+     call evalN2
+     call annotations
+     call findresonances
+     call plotthesolutions(EyExmax,EzExmax)
+     call color(15)
+  enddo
+  call prtend('')
 end subroutine plotNs
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine plotNperps
+  real dxa,dya,xleg
+  call setupplots
+  call boxtitle('N!d!A`!@!d for N!d!A|!@!d given by line lables')
+  call winset(.true.)
+  call color(15)
+  if(.not.logy)call polyline((/omega(1),omega(nomega)/),(/1.,1./),2)
+  call annotationperp
+  do iNpar=1,nNpar
+     Na=(Npmax*(iNpar)/(nNpar))
+     N2a=Na**2
+     thetadeg=45.
+     call evalNperp2
+     !     write(*,*)'iNpar,Na,N2a',iNpar,Na,N2a
+     call color(15)
+     !   write(*,'(4f8.4)')(omega(i),S(i),N2P(i),N2M(i),i=1,nomega)
+     call fwrite(Na,iw,1,string)
+     logic=.true.
+     where(F2.le.0. .and. cshift(F2,1).gt.0.)
+        N2P=0.5*(cshift(N2P,1)+cshift(N2M,1))
+        N2M=N2P
+     elsewhere(F2.le.0. .and. cshift(F2,-1).gt.0.)
+        N2P=0.5*(cshift(N2P,-1)+cshift(N2M,-1))
+        N2M=N2P
+     elsewhere(F2.le.0. &
+          .or. cshift(N2M,-1)*N2M.lt.-10. &
+          .or. cshift(N2M,1)*N2M.lt.-10. &
+          )
+        logic=.false.
+     end where
+     call color(colorslow)
+     call polygapline(omega,N2P,nomega,logic)
+     i=(iatomega(olh)+nomega/5-(nomega/16)*mod(1+iNpar,2))
+     if(Na.le.1)i=(iatomega(olh)-(nomega/20))
+     i=max(min(i,nomega-1),1)
+     dxa=wx2nx(omega(i+1))-wx2nx(omega(i))
+     dya=wy2ny(N2P(i+1))-wy2ny(N2P(i))
+     call charangl(atan2(dya,dxa)*180./3.1415926)
+     call jdrwstr(wx2nx(omega(i)),wy2ny(N2P(i)),string,0.5)
+     call charangl(0.)
+     if(.not.logx.or.olh/omega(1).lt.15.)xleg=0.7
+     call legendline(xleg,.95,0,'Slow Wave')
+
+     call color(colorfast)
+     call dashset(colorfast)
+     call legendline(xleg,.9,0,'Fast Wave')
+     call polygapline(omega,N2M,nomega,logic)
+     i=iatomega(olh)+nomega/20
+     i=max(min(i,nomega-1),1)
+     dxa=wx2nx(omega(i+1))-wx2nx(omega(i))
+     dya=wy2ny(N2M(i+1))-wy2ny(N2M(i))
+     call charangl(atan2(dya,dxa)*180./3.1415926)
+     call jdrwstr(wx2nx(omega(i)),wy2ny(N2M(i)),string,0.5)
+     call charangl(0.)
+     call dashset(0)
+  enddo
+  call prtend('')
+end subroutine plotNperps
+
 
 end module plasma
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -433,6 +556,7 @@ ipf=0
 EyExmax=2.8
 EzExmax=2.8
 ntheta=10
+Npmax=5
 
 ! Handle command line arguments and settings.
 call readsettings
@@ -446,14 +570,18 @@ else
    N2min=-1.
    N2max=10.
 endif
-
 xnlower=.17
-! Start of user interface loop.
 
+! Start of user interface loop.
 1 continue
+
 call initialize
-call plotNs
-if(ipf.lt.0)then
+if(lperp)then
+   call plotNperps
+else
+   call plotNs
+endif
+if(ipf.lt.0)then  ! If in no-wait plotting mode always save settings.
    call savesettings
    call exit()
 endif
@@ -463,8 +591,6 @@ call eye3d(iw)
 call uif(iw)
 if(iw.ne.0)goto 1
 
-write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta      current values are'
-write(*,'(4f10.4,i4)')omegace,omegamax,N2min,N2max,ntheta
 !write(*,*)'Append a further integer parameter -3 to print plot without stopping.'
 end program coldplas
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
