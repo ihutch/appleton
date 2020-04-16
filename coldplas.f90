@@ -32,8 +32,12 @@
 ! Solution is
 ! N2e^2 = (B\pm F)/2A.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-module plasma
+! Non-uniform plasma plot with given Npar uses the alternative display
+! but the omegaf is fixed and the omegape varies. We arrive at the same
+! calculation by substituting omega=omegaf/omegape, and
+! omegace=omegace/omegape. Ensure that no element of omegape is zero!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+module coldplasmawaves
 implicit none
 integer, parameter :: nspecies=2,nomega=2000
 integer :: ispecies,i,itheta,ntheta,iw,ipf,iNpar,nNpar=10
@@ -48,12 +52,15 @@ real, dimension(nomega) :: EyExP,EzExP,EyExM,EzExM
 real :: theta,sintheta,costheta
 character*3 sangle
 real, external :: wy2ny,wx2nx
-! Coldperp extra variables
+! Coldperp and Nomegape extra variables
 logical, dimension(nomega) :: logic
+real, dimension(nomega) :: omegape=1.,omegapi
 logical :: lperp=.false.
+integer :: iplottype=1
 real :: N2a,Npmax=5,Na,olh,ouh
 integer :: colorfast=2,colorslow=1
 complex, dimension(nomega) :: CN2P,CN2M
+real :: omegaf   ! The fixed frequency for omegape plots, unnormalized
 ! Control parameters:
 character*8 string
 character*20 argument
@@ -103,6 +110,7 @@ subroutine evalN2
 end subroutine evalN2
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine evalNperp2
+  ! omega, and omegace here are normalized to omegap
   S=1. ; D=0.; P=1.
   do ispecies=1,nspecies
      S=S-nj(ispecies)/&
@@ -117,7 +125,6 @@ subroutine evalNperp2
   B=(S-N2a)*(S+P)-D**2
   C=P*((S-N2a)**2-D**2)
   F2=B**2-4.*A*C
-     !     resfac=(omegace-omega)*(omega*Aj(2)-omegace)
   resfac=1.
   CN2P=(B*resfac+sqrt(F2*resfac**2))/(2.*A*resfac)
   CN2M=(B*resfac-sqrt(F2*resfac**2))/(2.*A*resfac)
@@ -132,6 +139,39 @@ subroutine evalNperp2
      N2M=real(CN2P)
   endwhere
 end subroutine evalNperp2
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine evalNperpop
+  ! omegape, and omegace here are unnormalized; so should be omegaf.
+  S=1. ; D=0.; P=1.
+  do ispecies=1,nspecies
+     S=S-nj(ispecies)/ &
+          (Aj(ispecies)*(omegaf/omegape)**2 &
+             -Zj(ispecies)**2*(omegace/omegape)**2/Aj(ispecies))
+     D=D- (Zj(ispecies)*omegace/(Aj(ispecies)*omegaf))* nj(ispecies)/&
+          (Aj(ispecies)*(omegaf/omegape)**2 &
+             -Zj(ispecies)**2*(omegace/omegape)**2/Aj(ispecies))
+     P=P- nj(ispecies)/(Aj(ispecies)*(omegaf/omegape))**2     
+  enddo
+  R=S+D
+  L=S-D
+  A=S
+  B=(S-N2a)*(S+P)-D**2
+  C=P*((S-N2a)**2-D**2)
+  F2=B**2-4.*A*C
+  resfac=1.
+  CN2P=(B*resfac+sqrt(F2*resfac**2))/(2.*A*resfac)
+  CN2M=(B*resfac-sqrt(F2*resfac**2))/(2.*A*resfac)
+  where(F2.lt.0)
+     N2P=0.
+     N2M=0.
+  elsewhere(real(CN2P).gt.real(CN2m))
+     N2P=real(CN2P)
+     N2M=real(CN2M)
+  elsewhere
+     N2P=real(CN2M)
+     N2M=real(CN2P)
+  endwhere
+end subroutine evalNperpop
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Various utilities
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -150,6 +190,27 @@ subroutine initialize ! Only the scope and omega arrays.
      endif
   enddo
 end subroutine initialize
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine initomegape
+  ! When doing omegape plots, interpret omegamax as the
+  ! maximum of omegapi/omegaf but omegapi is not normalized.
+  omegaf=sqrt(Aj(1)/Aj(2))
+  if(logx)then
+     omegapi(1)=omegfac*omegamax*omegaf/nomega
+  else
+     omegapi(1)=omegamax*omegaf/nomega
+  endif
+  do i=2,nomega
+     if(logx)then
+        omegapi(i)=omegapi(1)  &
+             *exp(alog(omegamax*omegaf/omegapi(1))*(i-1.)/(nomega-1.))
+     else
+        omegapi(i)=i*omegapi(1)   !linear
+     endif
+  enddo
+  ! The calculation is done in terms of omegape.
+  omegape=omegapi*sqrt(Aj(2)/Aj(1))                  ! Unnormalized.
+end subroutine initomegape
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 subroutine markatomega(om,frac,trace,yinc,mychar)
   real om,frac,yinc
@@ -194,9 +255,10 @@ subroutine readsettings
   if(ipf.ne.0)write(*,*)'Nonstop plotting',ipf
   if(ikey.ne.0)call savesettings    ! If key was a valid command
 ! Decide default plot ranges.
-  if(.not.logx)then; omegamax=3.5; else; omegamax=5.0001
+  if(.not.logx)then; omegamax=3.5;
+  else; omegamax=5.0001 ; if(iplottype.eq.3)omegamax=20.00001
   endif
-  if(logy)then; N2min=1.e-1; N2max=2000. ;
+  if(logy)then; N2min=1.e-1; N2max=2000. ; if(iplottype.eq.3)N2max=200000
   else; N2min=-1. ; N2max=10. ;
   endif
 end subroutine readsettings
@@ -221,10 +283,10 @@ subroutine uif(iw)
   integer :: iw
 call pfset(0) ! By default each new plot is not printed?
 if(iw.eq.ichar('r'))then
-   if(domce.lt..034*omegace)domce=domce*10.
+   if(domce.lt..034*omegace)domce=domce*5.
    omegace=omegace+domce
 elseif(iw.eq.ichar('e'))then
-   if(domce.gt..32*omegace)domce=domce/10.
+   if(domce.gt..32*omegace)domce=domce/5.
    omegace=omegace-domce
 elseif(iw.eq.ichar('p'))then
    call pfset(3)
@@ -235,10 +297,10 @@ elseif(iw.eq.ichar('h'))then
    write(*,*)'Y-RANGE EXPAND:u contract:i; X-RANGE (log) expnd:n cntrct:m d' 
    write(*,*)'B-VALUE e=decrs r=incrs; PRINT: p, SAVE settings: v,'
    write(*,*)'POLARIZATION toggle from Ey/Ex to Ez/Ex: z'
-   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle:\'
-   write(*,*)'ORDINATE plotting toggle from N to k:o'
+   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle: \'
+   write(*,*)'ORDINATE plotting toggle from N to k: o'
    write(*,*)'WAIT at end of plotting: w, NO-WAIT: a.',' TELL parameters: b'
-   write(*,*)'QUIT: q or single left click in window.'
+   write(*,*)'QUIT: q, return, or single left click in window.'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
    N2min=2.*N2min
@@ -278,20 +340,23 @@ elseif(iw.eq.ichar('o'))then
 elseif(iw.eq.ichar('y'))then
    logy=.not.logy
    if(logy)then
-      N2min=.1;   N2max=2000.
+      N2min=.1;   N2max=2000.; if(iplottype.eq.3)N2max=200000
    else
-      if(lperp)then; N2max=600.;N2min=-60.; else; N2min=-1.; N2max=10.;endif
+      if(lperp)then; N2max=600.;N2min=-60.
+      else; N2min=-1.; N2max=10.;endif
    endif
 elseif(iw.eq.ichar('c'))then
    omegace=2.5
-   omegamax=5.0001
+   omegamax=5.0001; if(iplottype.eq.3)omegamax=20.00001
    N2min=1.e-1
    N2max=8000.
 elseif(iw.eq.ichar('v'))then
    call savesettings
 elseif(iw.eq.ichar('\'))then
    lperp=.not.lperp
-elseif(iw.eq.ichar('q'))then
+   iplottype=mod(iplottype,3)+1
+   if(iplottype.eq.3)omegamax=20.00001
+elseif(iw.eq.ichar('q').or.iw.eq.65293)then
    iw=0
 elseif(iw.eq.ichar('b'))then
    write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta  current values'
@@ -303,7 +368,7 @@ end subroutine uif
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Plotting and Annotating 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-subroutine annotations
+subroutine annotationN2
   implicit none
   real :: ynorm,oalfven
   real, external :: wx2nx,wy2ny
@@ -391,7 +456,7 @@ subroutine annotations
       endif
       call charangl(0.)
    endif
- end subroutine annotations
+ end subroutine annotationN2
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine annotationperp
    external wy2ny,wx2nx
@@ -423,6 +488,38 @@ subroutine annotations
    call polyline((/olh,olh/),(/N2min,N2max/),2)
    call color(15)
  end subroutine annotationperp
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+ subroutine annotateNomegape
+   external wy2ny,wx2nx
+   real wy2ny,wx2nx,ynorm
+   real ogc,oin,opeeqom
+   real Rde,Rdi
+   ynorm=wy2ny(N2min)+.035
+   ogc=omegace/omegaf*sqrt(Aj(1)/Aj(2))
+   oin=omegace/omegaf*Aj(1)/Aj(2)
+   opeeqom=sqrt(Aj(1)/Aj(2))
+   ! Lower hybrid frequency for single ion species. Solving for omegapi
+   ! at given omega. omegapi^2=Rde*Rdi/(Rde+Aj(2)/Aj(1)*Rdi) where
+   ! Rde,i = (omega^2-Omegae,i^2). Then one must normalize by omegaf.
+   Rde=omegaf**2-omegace**2
+   Rdi=omegaf**2-(omegace*Aj(1)/Aj(2))**2
+   olh=Rde*Rdi/(Rde+Rdi*Aj(2)/Aj(1))
+   olh=sqrt(olh)/omegaf ! This becomes nan and suppresses plotting when needed
+   call color(colorslow)
+   call polyline((/olh,olh/),(/N2min,N2max/),2)
+   call color(15)
+!   write(*,*)ogc,omegace,omegaf,olh
+   call jdrwstr(wx2nx(ogc),ynorm,'!A}!@',0)
+   call drcstr('(!AW!@!di!d!AW!@!de!d)!u1/2!u/!Aw!@')
+   call jdrwstr(wx2nx(oin),ynorm,'!A}!@',0)
+   call drcstr('!AW!@!di!d/!Aw!@')
+   call jdrwstr(wx2nx(opeeqom),ynorm+.035,'!A{!@',0)
+   call jdrwstr(wx2nx(opeeqom),ynorm+.035,'!Aw!@!dpe!d/!Aw!@=1',-1.1)
+   call jdrwstr(wx2nx(olh),ynorm+.07,'!A{!@',0)
+   call jdrwstr(wx2nx(olh),ynorm+.07,'!Aw!@!dLH!d/!Aw!@=1',-1.1)
+
+  
+ end subroutine annotateNomegape
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  subroutine plotthesolutions(EyExmax,EzExmax)
    real :: EyExmax,EzExmax
@@ -477,8 +574,7 @@ subroutine annotations
       if(lperp)then
          call axlabels('!Aw!@/!Aw!@!dp!d','N!d!a`!@!d')
          if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.)-.035, &
-           '-|N!d!A`!@!d!u2!u|!u1/2!u',-1.1)
-               
+           '-|N!d!A`!@!d!u2!u|!u1/2!u',-1.1)               
       else
          call axlabels('!Aw!@/!Aw!@!dp!d','N')
          if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.97*N2min+0.03*N2max), &
@@ -486,6 +582,18 @@ subroutine annotations
       endif
    endif
  end subroutine setupplots
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+ subroutine setupomegape
+   call axregion(.15,.88,.1,.7)
+   call pltinit(0.,omegapi(nomega),N2min,N2max)
+   call charsize(.018,.018)
+   call scalewn(omegapi(1),omegapi(nomega),N2min,N2max,logx,logy)
+   call axis()
+   call axis2
+   call axlabels('!Aw!@!dpi!d/!Aw!@','N!d!a`!@!d')
+   if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.)-.035, &
+        '-|N!d!A`!@!d!u2!u|!u1/2!u',-1.1)
+ end subroutine setupomegape
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
 subroutine plotNs
   call setupplots
@@ -501,7 +609,7 @@ subroutine plotNs
      call findresonances
      call plotthesolutions(EyExmax,EzExmax)
      call color(15)
-     call annotations ! Must be after findresonances
+     call annotationN2 ! Must be after findresonances
   enddo
   call prtend('')
 end subroutine plotNs
@@ -544,6 +652,7 @@ subroutine plotNperps
      call charangl(atan2(dya,dxa)*180./3.1415926)
      call jdrwstr(wx2nx(omega(i)),wy2ny(N2P(i)),string,0.5)
      call charangl(0.)
+     xleg=0.02
      if(.not.logx.or.olh/omega(1).lt.15.)xleg=0.7
      call legendline(xleg,.95,0,'Slow Wave')
 
@@ -562,19 +671,84 @@ subroutine plotNperps
   enddo
   call prtend('')
 end subroutine plotNperps
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+subroutine plotNomegape
+  real dxa,dya,xleg
+  integer iwidth
+!  real vminus,vat,vplus
+  omegapi=omegapi/omegaf  ! Scale omegapi for plotting.
+  call setupomegape
+  call fwrite(omegace/omegaf*sqrt(Aj(1)/Aj(2)),iwidth,3,string)
+  call boxtitle('N!d!A`!@!d for N!d!A|!@!d given by line labels.' &
+   //'  (!AW!@!di!d!AW!@!de!d)!u1/2!u/!Aw!@='//string(1:iwidth))
+  call winset(.true.)
+  call color(15)
+  call annotateNomegape
+  do iNpar=1,nNpar
+     Na=(Npmax*(iNpar)/(nNpar))
+     N2a=Na**2
+     call evalNperpop
+     call color(15)
+     call fwrite(Na,iw,1,string)
+     logic=.true.
+     where(F2.le.0. .and. cshift(F2,1).gt.0.)
+        N2P=0.5*(cshift(N2P,1)+cshift(N2M,1))
+        N2M=N2P
+     elsewhere(F2.le.0. .and. cshift(F2,-1).gt.0.)
+        N2P=0.5*(cshift(N2P,-1)+cshift(N2M,-1))
+        N2M=N2P
+     elsewhere(F2.le.0. &
+          .or. cshift(N2M,-1)*N2M.lt.-10. &
+          .or. cshift(N2M,1)*N2M.lt.-10. &
+          )
+        logic=.false.
+     end where
 
+     xleg=0.02
+     !     if(.not.logx.or.olh/omegapi(1).lt.15.)xleg=0.7
+     call color(colorfast)
+     call dashset(colorfast)
+     call legendline(xleg,.9,0,'Fast Wave')
+     call polygapline(omegapi,N2M,nomega,logic)
+!     i=iatomega(olh)+nomega/20
+!     i=max(min(i,nomega-1),1)
+     i=nomega/3
+     dxa=wx2nx(omegapi(i+1))-wx2nx(omegapi(i))
+     dya=wy2ny(N2M(i+1))-wy2ny(N2M(i))
+     call charangl(atan2(dya,dxa)*180./3.1415926)
+     call jdrwstr(wx2nx(omegapi(i)),wy2ny(N2M(i)),string,0.5)
+     call charangl(0.)
+     call dashset(0)
 
-end module plasma
+! Attempts to improve slow wave plot don't work.     
+!     where(N2P.gt.1.e5.and.cshift(N2P,1).lt.1.); N2P=100.; endwhere
+!     where(N2P.lt.1..and.cshift(N2P,-1).gt.1.e5); N2P=cshift(N2P,1); endwhere
+!     where(N2P.lt.1.e-5.and.cshift(N2P,1).gt.1) ; logic=.false.; endwhere
+     call color(colorslow)
+     call polygapline(omegapi,N2P,nomega,logic)
+     i=nomega/2
+     if(mod(iNpar,2).eq.0)i=nomega/3
+     dxa=wx2nx(omegapi(i+1))-wx2nx(omegapi(i))
+     dya=wy2ny(N2P(i+1))-wy2ny(N2P(i))
+     call charangl(atan2(dya,dxa)*180./3.1415926)
+     call jdrwstr(wx2nx(omegapi(i)),wy2ny(N2P(i)),string,0.5)
+     call charangl(0.)
+     call legendline(xleg,.95,0,'Slow Wave')
+  enddo
+  call prtend('')
+  
+end subroutine plotNomegape
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+end module coldplasmawaves
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Has to be after the plasma module in this file.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 program coldplas
-use plasma
+use coldplasmawaves
 
 !Defaults
 omegace=2.5
 domce=0.1
-! Now set in readsettings omegamax=5.0001
 ipf=0
 EyExmax=2.8
 EzExmax=2.8
@@ -592,10 +766,13 @@ call setiwarn(0) ! Silence range warnings
 1 continue
 
 call initialize
-if(lperp)then
-   call plotNperps
-else
+if(iplottype.eq.1)then
    call plotNs
+elseif(iplottype.eq.2)then
+   call plotNperps
+elseif(iplottype.eq.3)then
+   call initomegape
+   call plotNomegape
 endif
 
 if(ipf.lt.0)then  ! If in no-wait plotting mode always save settings.
