@@ -297,9 +297,9 @@ elseif(iw.eq.ichar('h'))then
    write(*,*)'Y-RANGE EXPAND:u contract:i; X-RANGE (log) expnd:n cntrct:m d' 
    write(*,*)'B-VALUE e=decrs r=incrs; PRINT: p, SAVE settings: v,'
    write(*,*)'POLARIZATION toggle from Ey/Ex to Ez/Ex: z'
-   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle: \'
+   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle: -'
    write(*,*)'ORDINATE plotting toggle from N to k: o'
-   write(*,*)'WAIT at end of plotting: w, NO-WAIT: a.',' TELL parameters: b'
+   write(*,*)'WAIT at end of plotting: w, NO-WAIT: a.',' TELL parameters: t'
    write(*,*)'QUIT: q, return, or single left click in window.'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
@@ -352,18 +352,20 @@ elseif(iw.eq.ichar('c'))then
    N2max=8000.
 elseif(iw.eq.ichar('v'))then
    call savesettings
-elseif(iw.eq.ichar('\'))then
+elseif(iw.eq.ichar('-').or.iw.eq.189)then   
    lperp=.not.lperp
    iplottype=mod(iplottype,3)+1
    if(iplottype.eq.3)omegamax=20.00001
 elseif(iw.eq.ichar('q').or.iw.eq.65293)then
    iw=0
-elseif(iw.eq.ichar('b'))then
+elseif(iw.eq.ichar('t'))then
    write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta  current values'
    write(*,'(4f10.4,i4)')omegace,omegamax,N2min,N2max,ntheta
 
 else
+   write(*,*)'key number=',iw,' not recognized'
 endif
+!   write(*,*)'iw number=',iw
 end subroutine uif
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! Plotting and Annotating 
