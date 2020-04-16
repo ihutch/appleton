@@ -549,6 +549,7 @@ subroutine annotationN2
  subroutine setupplots
    call axregion(.15,.88,.1,.7)
    call pltinit(0.,omega(nomega),N2min,N2max)
+   call color(15)
    call charsize(.018,.018)
    if(.not.lperp)then
       call gradlegend(0.,EyExmax,1.04,0.,1.04,1.,.01,.true.)
@@ -588,6 +589,7 @@ subroutine annotationN2
  subroutine setupomegape
    call axregion(.15,.88,.1,.7)
    call pltinit(0.,omegapi(nomega),N2min,N2max)
+   call color(15)
    call charsize(.018,.018)
    call scalewn(omegapi(1),omegapi(nomega),N2min,N2max,logx,logy)
    call axis()
