@@ -1,6 +1,6 @@
 
 FORTRAN=gfortran
-XLIBS = -L. -laccisX -lX11
+XLIBS = -L. -L/opt/X11/lib -laccisX -lX11
 MINGW=i686-w64-mingw32-gfortran
 MINGW-SWITCHES= -H -mwindows -mconsole --static
 MINGWLIBS=-L. -laccisWin

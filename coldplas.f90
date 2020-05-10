@@ -64,7 +64,7 @@ real :: omegaf   ! The fixed frequency for omegape plots, unnormalized
 ! Control parameters:
 character*8 string
 character*20 argument
-integer :: ikey=0
+integer :: ikey=0,manyplot=0
 real :: izero,xnlower=.17
 logical :: lEz=.false.,logx=.true.,logy=.true.,lplotomega=.false.
 
@@ -281,7 +281,7 @@ end subroutine readsettings
 subroutine uif(iw)
 ! User interface routine
   integer :: iw
-call pfset(0) ! By default each new plot is not printed?
+if(manyplot.eq.0)call pfset(0) ! By default each new plot is not printed
 if(iw.eq.ichar('r'))then
    if(domce.lt..034*omegace)domce=domce*5.
    omegace=omegace+domce
@@ -295,11 +295,12 @@ elseif(iw.eq.ichar('h'))then
    write(*,*)'Keyboard and command line graph-control keys as follows'
    write(*,*)'Y-RANGE SHIFT: up/k down/l; X-RANGE: left/s right/d'
    write(*,*)'Y-RANGE EXPAND:u contract:i; X-RANGE (log) expnd:n cntrct:m d' 
-   write(*,*)'B-VALUE e=decrs r=incrs; PRINT: p, SAVE settings: v,'
+   write(*,*)'B-VALUE e=decrs r=incrs; SAVE settings: v,'
    write(*,*)'POLARIZATION toggle from Ey/Ex to Ez/Ex: z'
-   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N plotting toggle: -'
+   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N ordinate toggle: -'
    write(*,*)'ORDINATE plotting toggle from N to k: o'
-   write(*,*)'WAIT at end of plotting: w, NO-WAIT: a.',' TELL parameters: t'
+   write(*,*)'WAIT at end of plotting: w, NO-WAIT: a,',' TELL parameters: t'
+   write(*,*)'PRINT plot: p, EVERY FRAME print (movie) toggle: .'
    write(*,*)'QUIT: q, return, or single left click in window.'
 elseif(iw.eq.65362.or.iw.eq.ichar('k'))then
    N2max=2.*N2max
@@ -361,7 +362,8 @@ elseif(iw.eq.ichar('q').or.iw.eq.65293)then
 elseif(iw.eq.ichar('t'))then
    write(*,*)'  omegace, omegamax, N2min,   N2max,  ntheta  current values'
    write(*,'(4f10.4,i4)')omegace,omegamax,N2min,N2max,ntheta
-
+elseif(iw.eq.ichar('.'))then
+   manyplot=mod(manyplot+1,2)
 else
    write(*,*)'key number=',iw,' not recognized'
 endif
