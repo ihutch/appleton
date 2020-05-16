@@ -46,7 +46,7 @@ real, dimension(nspecies) :: nj,Aj,Zj
 real :: omegace,omegamax,domce   ! over omegape.
 real :: omegfac=0.2              ! Factor for log omega minumum.
 real :: N2min,N2max,EyExmax,EzExmax,thetadeg
-real, dimension(nomega) :: S,D,P,R,L,A,B,C,F2,resfac
+real, dimension(nomega) :: S,D,P,R,L,A,B,C,F2,resfac,F
 real, dimension(nomega) ::  N2P,N2M,omega,X,Y,Nplus,Nminus
 real, dimension(nomega) :: EyExP,EzExP,EyExM,EzExM 
 real :: theta,sintheta,costheta
@@ -87,16 +87,12 @@ subroutine evalN2
   A=S*sintheta**2+P*costheta**2
   B=R*L*sintheta**2+P*S*(1+costheta**2)
   C=P*R*L
-  F2=(R*L-P*S)**2*sintheta**4+4*P**2*D**2*costheta**2
+!  F2=(R*L-P*S)**2*sintheta**4+4*P**2*D**2*costheta**2
+! Avoid overflows at low frequency by taking sqrt with P factor outside
+  F=sqrt((R*L/P-S)**2*sintheta**4+4*D**2*costheta**2)*abs(P)
   ! Explicit Sign flips at omega= omegac
-  if(.true.)then ! This version works well at low omega.
-     N2P=2.*C/(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))
-     N2M=2.*C/(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))
-  else  ! This does not work well at low omega.
-     N2P=(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
-     N2M=(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*sqrt(F2))/(2.*A)
-  endif
-! Polarizations Ey/iEx and Ez/Ex.
+  N2P=2.*C/(B-sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*F)
+  N2M=2.*C/(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*F)
   EyExP=D/(N2P-S)
   EyExM=D/(N2M-S)
   EzExP=N2P*sintheta*costheta/(N2P*sintheta**2-S)
@@ -256,7 +252,7 @@ subroutine readsettings
   if(ikey.ne.0)call savesettings    ! If key was a valid command
 ! Decide default plot ranges.
   if(.not.logx)then; omegamax=3.5;
-  else; omegamax=5.0001 ; if(iplottype.eq.3)omegamax=20.00001
+  else; omegamax=5.001 ; if(iplottype.eq.3)omegamax=20.00001
   endif
   if(logy)then; N2min=1.e-1; N2max=2000. ; if(iplottype.eq.3)N2max=200000
   else; N2min=-1. ; N2max=10. ;
@@ -267,8 +263,10 @@ end subroutine readsettings
    implicit none
 ! Ensure correct plotting of resonances by adjusting at gaps.
    ntm=nomega
-   do i=3,nomega ! Find the resonance gaps for plotting.
-      if(ntm.eq.nomega.and.N2M(i-1).gt.1.and.N2M(i).lt.1.)ntm=i
+   ntp=nomega
+   do i=3,nomega ! Find the resonance gaps for plotting, annotation.
+      if(N2P(i-1).gt.1. .and. N2P(i).lt.1..and.omega(i-1).le.1) ntp=i
+      if(N2M(i-1).gt.1. .and. N2M(i).lt.1..and.omega(i-1).le.1) ntm=i
       if(Nminus(i-1).gt.0.and.Nminus(i).lt.0.)Nminus(i-1)=N2max
       if(Nminus(i-1).lt.N2min.and.Nminus(i).gt.N2min)Nminus(i)=N2min
       if(Nplus(i-1).gt.0.and.Nplus(i).lt.0)Nplus(i-1)=N2max
@@ -287,17 +285,17 @@ if(iw.eq.ichar('r'))then
    omegace=omegace+domce
 elseif(iw.eq.ichar('e'))then
    if(domce.gt..32*omegace)domce=domce/5.
-   omegace=omegace-domce
+   if(omegace.gt.1.e-3)omegace=omegace-domce
 elseif(iw.eq.ichar('p'))then
    call pfset(3)
 elseif(iw.eq.ichar('h'))then
    write(*,*)'Usage coldplas [<key> ... ]'
    write(*,*)'Keyboard and command line graph-control keys as follows'
    write(*,*)'Y-RANGE SHIFT: up/k down/l; X-RANGE: left/s right/d'
-   write(*,*)'Y-RANGE EXPAND:u contract:i; X-RANGE (log) expnd:n cntrct:m d' 
+   write(*,*)'Y-RANGE EXPAND:u CONTRACT:i; X-RANGE (log) EXPND:n CNTRCT:m' 
    write(*,*)'B-VALUE e=decrs r=incrs; SAVE settings: v,'
    write(*,*)'POLARIZATION toggle from Ey/Ex to Ez/Ex: z'
-   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP, N ordinate toggle: -'
+   write(*,*)'LOGARITHMIC axes toggle: x, y.',' NPERP/NTOT plot cycle: -'
    write(*,*)'ORDINATE plotting toggle from N to k: o'
    write(*,*)'WAIT at end of plotting: w, NO-WAIT: a,',' TELL parameters: t'
    write(*,*)'PRINT plot: p, EVERY FRAME print (movie) toggle: .'
@@ -321,9 +319,9 @@ elseif(iw.eq.65363.or.iw.eq.ichar('d'))then
       if(omegamax.lt.3.*omegace)omegamax=omegamax*2.
    endif
 elseif(iw.eq.ichar('n'))then
-   omegfac=omegfac/2.
+   if(omegfac.gt.1.e-4)omegfac=omegfac/2.
 elseif(iw.eq.ichar('m'))then
-   omegfac=omegfac*2.
+   if(omegfac.lt.1.e2)omegfac=omegfac*2.
 elseif(iw.eq.ichar('u'))then
    N2min=N2min/2.
 elseif(iw.eq.ichar('i'))then
@@ -353,9 +351,13 @@ elseif(iw.eq.ichar('c'))then
    N2max=8000.
 elseif(iw.eq.ichar('v'))then
    call savesettings
-elseif(iw.eq.ichar('-').or.iw.eq.189)then   
-   lperp=.not.lperp
+elseif(iw.eq.ichar('-').or.iw.eq.189)then
    iplottype=mod(iplottype,3)+1
+   if(iplottype.eq.1)then
+      lperp=.false.
+   else
+      lperp=.true.
+   endif
    if(iplottype.eq.3)omegamax=20.00001
 elseif(iw.eq.ichar('q').or.iw.eq.65293)then
    iw=0
@@ -429,15 +431,15 @@ subroutine annotationN2
            +sqrt(omegace**2*(1+Aj(1)/Aj(2))**2+4.*(1+Aj(1)/Aj(2))))/2.,&
            -.75,N2P,.033,'!Aw!@!dL!d!A{!@') ! Left cut needs ion corrections
       call charangl(90.)
+         if(logx.or.omegamax.lt.4.)then
+            call charangl(70.)
+            call markatomega(.08*min(1.,omegace),1.,Nminus,0.,' Helicon or')
+            call markatomega(.14*min(1.,omegace),1.,Nminus,0.,' Whistler Branch')
+            call charangl(90.)
+         endif
       if(omegace.ge.1.)then
          if(wy2ny(N2max).gt.wy2ny(2.)+.33) &
               call markatomega(.6,2.,Nminus,0.,'!Aw!@!dp!dcos!Aq!B{!@')
-         if(logx.or.omegamax.lt.4.)then
-            call charangl(70.)
-            call markatomega(.1,1.,Nminus,0.,' Helicon or')
-            call markatomega(.16,1.,Nminus,0.,' Whistler Branch')
-            call charangl(90.)
-         endif
       else
          call markatomega(.5*omegace,1.,Nminus,0.,' Electron cyclotron waves')
       endif
@@ -577,7 +579,7 @@ subroutine annotationN2
       endif
    else
       if(lperp)then
-         call axlabels('!Aw!@/!Aw!@!dp!d','N!d!a`!@!d')
+         call axlabels('!Aw!@/!Aw!@!dp!d','N!d!A`!@!d')
          if(N2min.lt.0.)call jdrwstr(0.15,wy2ny(0.)-.035, &
            '-|N!d!A`!@!d!u2!u|!u1/2!u',-1.1)               
       else

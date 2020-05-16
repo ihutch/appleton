@@ -1,30 +1,43 @@
 This code interactively plots the Appleton-Hartree dispersion relation
-governing waves in a cold plasma. Its purpose is primarily
-pedagogical.  It is controlled from the keyboard, for which help can
-be obtained when it is running by hitting the key 'h'.
+governing waves in a cold plasma. 
 
-On MSWindows, download just the complete executable: coldplas.exe. It
-runs perfectly in native Windows and under the 'wine' system.
+Its purpose is primarily pedagogical, providing rapid evolution of the
+display, which animates the variation of parameters. Playing with it helps
+to develop an intuitive understanding of the complex physics of plasma
+waves. It is controlled from the keyboard. Help can be obtained when
+it is running by hitting the key 'h'.
+_______________________________________________________________________
 
-On MacOS, you can run coldplas.exe if you install wine by
-$ brew cask install wine-stable
-(Or see e.g https://www.davidbaumgold.com/tutorials/wine-mac/)
+On MSWindows, download and run just the complete executable:
+coldplas.exe.  That executable also runs perfectly under the 'wine'
+system. On MacOS, if you have wine installed then 'wine coldplas.exe'
+will work fine.
 
-To create an executable program from source on MacOS or linux type
-$ make
-it will git clone and compile the required graphics library.
-But you need gfortran and the X11 libraries accessible.
-[On MacOS $ brew install gcc; brew cask install xquartz ]
-It is usually best run from the command line by: $ ./coldplas
-The native compiled version is considerably more responsive than
-running under wine. 
+To create an executable program from source, probably the best option
+on MacOS and certainly on linux, at the commandline type 'make' and it
+will git clone and compile the required graphics library and compile
+coldplas.  The command './coldplas' will run the program.
 
-For the adventurous only: the makefile with 'make windows' is set up
-to use the mingw-32 cross-compiler to produce a Windows executable
-coldplas.exe.  Edit the makefile to replace MINGW or FORTRAN with
-references to your compiler. But it must be compatible with the
-gfortran/gcc compilers that produced the required and included
-graphics libaries libaccisX.a or libaccisWin.a.
+You need git, gfortran and the X11 libraries accessible for compilation.
+On MacOS, fulfilling those needs involves something like either:
+
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+In Finder double click on Homebrew to install, then in Terminal
+brew install gcc
+brew cask install xquartz
+make
+
+or
+
+From https://www.macports.org/install.php
+download the install file of MacPorts appropriate for your macOS version.
+In Finder double click on it to install it, then in Terminal
+sudo port install xorg-libX11
+sudo port install gcc5
+sudo port select --set gcc mp-gcc5
+
+Don't try to 'make coldplas.exe' using a cross-compiler unless you
+have one, really know what you are doing, and can hack the makefile.
 
 No guarantee of fitness for any purpose whatever is given, and anyone
 using the program does so at their own risk.
