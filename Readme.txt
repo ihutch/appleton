@@ -19,22 +19,16 @@ will git clone and compile the required graphics library and compile
 coldplas.  The command './coldplas' will run the program.
 
 You need git, gfortran and the X11 libraries accessible for compilation.
-On MacOS, fulfilling those needs involves something like either:
+On MacOS, to fulfil those needs, in Terminal run the script
+ $  ./InstallByHomebrew
 
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-In Finder double click on Homebrew to install, then in Terminal
-brew install gcc
-brew cask install xquartz
-make
-
-or
-
-From https://www.macports.org/install.php
+Or if you prefer, from https://www.macports.org/install.php
 download the install file of MacPorts appropriate for your macOS version.
 In Finder double click on it to install it, then in Terminal
 sudo port install xorg-libX11
 sudo port install gcc5
 sudo port select --set gcc mp-gcc5
+make
 
 Don't try to 'make coldplas.exe' using a cross-compiler unless you
 have one, really know what you are doing, and can hack the makefile.
@@ -42,3 +36,5 @@ have one, really know what you are doing, and can hack the makefile.
 No guarantee of fitness for any purpose whatever is given, and anyone
 using the program does so at their own risk.
 Copyright (C) Ian H Hutchinson 2017-2020.
+
+<img src="https://github.com/ihutch/appleton/blob/master/appleton.gif"/>

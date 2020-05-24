@@ -1,0 +1,33 @@
+#!/bin/bash
+# Install using Homebrew the software tools needed to compile and run
+# the coldplas program. If the argument is uninstall, then uninstall.
+
+if [ $# -eq 0 ]; then
+
+# Try to install
+ if which brew; then echo Homebrew already installed ;
+ else
+  echo Installing Homebrew. It will take a few minutes. 
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+ fi
+ echo Verifying/Installing gcc and xquartz. The install takes a few minutes.
+ brew install gcc
+ brew cask install xquartz
+ make
+ echo If make was successful, run the program by ./coldplas .
+
+else
+
+ if [ "$1" == "uninstall" ] ; then
+# Uninstall
+ echo uninstalling xquartz and gcc
+ brew cask uninstall xquartz
+ brew uninstall gcc
+ echo uninstalling Homebrew
+ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/uninstall.sh)"
+ else
+ echo USAGE: $0 [uninstall, help]
+ echo Install the tools to make the program coldplas. When done run by ./coldplas
+ fi
+ 
+fi
