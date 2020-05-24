@@ -30,6 +30,9 @@ sudo port install gcc5
 sudo port select --set gcc mp-gcc5
 make
 
+After you install xquartz (=X11) you must restart your computer before
+coldplas will run. That's something to do with xquartz.
+
 Don't try to 'make coldplas.exe' using a cross-compiler unless you
 have one, really know what you are doing, and can hack the makefile.
 
@@ -37,4 +40,4 @@ No guarantee of fitness for any purpose whatever is given, and anyone
 using the program does so at their own risk.
 Copyright (C) Ian H Hutchinson 2017-2020.
 
-<img src="https://github.com/ihutch/appleton/blob/master/appleton.gif"/>
+<img src="https://github.com/ihutch/appleton/blob/master/appleton.gif">
