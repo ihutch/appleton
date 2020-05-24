@@ -22,16 +22,18 @@ You need git, gfortran and the X11 libraries accessible for compilation.
 On MacOS, to fulfil those needs, in Terminal run the script
  $  ./InstallByHomebrew
 
-Or if you prefer, from https://www.macports.org/install.php
+[Or if you prefer, from https://www.macports.org/install.php
 download the install file of MacPorts appropriate for your macOS version.
 In Finder double click on it to install it, then in Terminal
 sudo port install xorg-libX11
 sudo port install gcc5
 sudo port select --set gcc mp-gcc5
-make
+make]
 
-After you install xquartz (=X11) you must restart your computer before
-coldplas will run. That's something to do with xquartz.
+After you first install xquartz (=X11) you must restart your computer
+before coldplas will run, otherwise it complains "cannot connect to X
+server". That's something to do with xquartz (a new Terminal is not
+enough).
 
 Don't try to 'make coldplas.exe' using a cross-compiler unless you
 have one, really know what you are doing, and can hack the makefile.

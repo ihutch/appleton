@@ -14,7 +14,8 @@ if [ $# -eq 0 ]; then
  brew install gcc
  brew cask install xquartz
  make
- echo If make was successful, run the program by ./coldplas .
+ echo If make was successful, and xquartz was newly installed, restart computer.
+ echo Then, in this directory, the command ./coldplas will run the program. 
 
 else
 
