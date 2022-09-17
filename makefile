@@ -28,10 +28,10 @@ MINGWLIBS=-L. -laccisWin
 
 default : coldplas $(LIBDEPS)
 
-windows : coldplas.exe libaccisWin.a
+windows : libaccisWin.a coldplas.exe
 
-renewlibs :
-	cp /home/hutch/accis/drivers/win64/libaccisWin.a .
+libaccisWin.a : 
+	cp accis/libaccisWin.a .
 
 clean :
 	rm -f coldplas
