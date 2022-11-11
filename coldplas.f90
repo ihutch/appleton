@@ -95,8 +95,9 @@ subroutine evalN2
   N2M=2.*C/(B+sign(1.,(1.-omega/omegace)*(omega*Aj(2)/omegace-1))*F)
   EyExP=D/(N2P-S)
   EyExM=D/(N2M-S)
-  EzExP=N2P*sintheta*costheta/(N2P*sintheta**2-S)
-  EzExM=N2M*sintheta*costheta/(N2M*sintheta**2-S)
+  EzExP=N2P*sintheta*costheta/(N2P*sintheta**2-P)
+  EzExM=N2M*sintheta*costheta/(N2M*sintheta**2-P)
+  if(sintheta.eq.1)EzExM=1.e3 ! Clean up polarization rounding errors.
   if(lplotomega)then
      N2P=N2P*omega**2
      N2M=N2M*omega**2
